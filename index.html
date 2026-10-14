@@ -1,0 +1,387 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Convert JPG and PNG images into one PDF file online. Simple, free and easy to use.">
+  <title>MyPDFConverter - JPG to PDF Online</title>
+
+  <!-- PDF generation library -->
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: #1f2937;
+      background: #f4f7fb;
+    }
+
+    header {
+      background: #ffffff;
+      padding: 20px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    header div, main, footer {
+      max-width: 850px;
+      margin: auto;
+    }
+
+    header strong {
+      font-size: 23px;
+      color: #2563eb;
+    }
+
+    main {
+      padding: 40px 18px;
+    }
+
+    .intro { text-align: center; margin-bottom: 28px; }
+
+    h1 { font-size: 34px; margin-bottom: 12px; }
+
+    .intro p { color: #64748b; line-height: 1.6; }
+
+    .panel {
+      background: #ffffff;
+      padding: 25px;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px #0f172a0a;
+    }
+
+    .upload {
+      display: block;
+      text-align: center;
+      padding: 32px 15px;
+      border: 2px dashed #93b4f8;
+      background: #f8faff;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .upload strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 9px;
+    }
+
+    .upload span { color: #64748b; font-size: 14px; }
+
+    input[type="file"] { display: none; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin: 22px 0 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 11px 15px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .secondary { background: #eaf0fb; color: #1d4ed8; }
+
+    .primary {
+      background: #2563eb;
+      color: #ffffff;
+      width: 100%;
+      margin-top: 20px;
+      padding: 15px;
+      font-size: 16px;
+    }
+
+    .file-list { display: grid; gap: 10px; }
+
+    .file {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 10px;
+      min-width: 0;
+    }
+
+    .file img {
+      width: 58px;
+      height: 58px;
+      object-fit: cover;
+      border-radius: 6px;
+      background: #f1f5f9;
+    }
+
+    .file-name {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 14px;
+    }
+
+    .file-actions { display: flex; gap: 5px; }
+
+    .file-actions button { padding: 8px; }
+
+    #status {
+      margin-top: 16px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .note {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+
+    footer {
+      padding: 20px;
+      text-align: center;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    @media (max-width: 520px) {
+      h1 { font-size: 27px; }
+      .panel { padding: 15px; }
+      .file { flex-wrap: wrap; }
+      .file-actions { margin-left: auto; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div><strong>MyPDFConverter</strong></div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1>Convert Images to PDF</h1>
+      <p>Combine your JPG or PNG images into one PDF file in a few clicks.</p>
+    </section>
+
+    <section class="panel">
+      <label class="upload" for="images">
+        <strong>Select your images</strong>
+        <span>Choose multiple JPG or PNG files from your device</span>
+      </label>
+
+      <input id="images" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple>
+
+      <div class="toolbar">
+        <strong id="count">No images selected</strong>
+        <button id="clear" class="secondary" type="button">Clear all</button>
+      </div>
+
+      <div id="fileList" class="file-list"></div>
+
+      <button id="convert" class="primary" type="button" disabled>
+        Convert to PDF
+      </button>
+
+      <div id="status" role="status" aria-live="polite"></div>
+
+      <p class="note">
+        Privacy: this demo processes images in your browser. The conversion
+        library is loaded from a third-party CDN. Use non-sensitive sample
+        images while testing. Large images may use substantial device memory.
+      </p>
+    </section>
+  </main>
+
+  <footer>MyPDFConverter · Simple document tools</footer>
+
+  <script>
+    const input = document.getElementById("images");
+    const fileList = document.getElementById("fileList");
+    const count = document.getElementById("count");
+    const convertButton = document.getElementById("convert");
+    const clearButton = document.getElementById("clear");
+    const status = document.getElementById("status");
+
+    let files = [];
+
+    input.addEventListener("change", () => {
+      const selected = Array.from(input.files || []);
+      const valid = selected.filter(file =>
+        ["image/jpeg", "image/png"].includes(file.type)
+      );
+
+      if (valid.length !== selected.length) {
+        status.textContent = "Only JPG, JPEG and PNG images are supported.";
+      } else {
+        status.textContent = "";
+      }
+
+      files.push(...valid);
+      input.value = "";
+      renderFiles();
+    });
+
+    function renderFiles() {
+      fileList.replaceChildren();
+
+      count.textContent = files.length
+        ? `${files.length} image(s) selected`
+        : "No images selected";
+
+      convertButton.disabled = files.length === 0;
+
+      files.forEach((file, index) => {
+        const row = document.createElement("div");
+        row.className = "file";
+
+        const preview = document.createElement("img");
+        const objectUrl = URL.createObjectURL(file);
+        preview.src = objectUrl;
+        preview.alt = "Image preview";
+        preview.onload = () => URL.revokeObjectURL(objectUrl);
+
+        const name = document.createElement("div");
+        name.className = "file-name";
+        name.textContent = file.name;
+
+        const actions = document.createElement("div");
+        actions.className = "file-actions";
+
+        const up = document.createElement("button");
+        up.className = "secondary";
+        up.type = "button";
+        up.textContent = "↑";
+        up.title = "Move up";
+        up.setAttribute("aria-label", "Move image up");
+        up.disabled = index === 0;
+        up.onclick = () => moveFile(index, -1);
+
+        const down = document.createElement("button");
+        down.className = "secondary";
+        down.type = "button";
+        down.textContent = "↓";
+        down.title = "Move down";
+        down.setAttribute("aria-label", "Move image down");
+        down.disabled = index === files.length - 1;
+        down.onclick = () => moveFile(index, 1);
+
+        const remove = document.createElement("button");
+        remove.className = "secondary";
+        remove.type = "button";
+        remove.textContent = "×";
+        remove.title = "Remove image";
+        remove.setAttribute("aria-label", "Remove image");
+        remove.onclick = () => {
+          files.splice(index, 1);
+          renderFiles();
+        };
+
+        actions.append(up, down, remove);
+        row.append(preview, name, actions);
+        fileList.append(row);
+      });
+    }
+
+    function moveFile(index, direction) {
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= files.length) return;
+
+      [files[index], files[newIndex]] = [files[newIndex], files[index]];
+      renderFiles();
+    }
+
+    clearButton.addEventListener("click", () => {
+      files = [];
+      status.textContent = "";
+      renderFiles();
+    });
+
+    convertButton.addEventListener("click", async () => {
+      if (!files.length) return;
+
+      if (!window.PDFLib) {
+        status.textContent = "The PDF library could not load. Check your internet connection and refresh.";
+        return;
+      }
+
+      convertButton.disabled = true;
+      status.textContent = "Creating your PDF. Please wait...";
+
+      try {
+        const { PDFDocument } = window.PDFLib;
+        const pdf = await PDFDocument.create();
+
+        // A4 page size in PDF points.
+        const pageWidth = 595.28;
+        const pageHeight = 841.89;
+        const margin = 24;
+
+        for (const file of files) {
+          const bytes = await file.arrayBuffer();
+          let image;
+
+          if (file.type === "image/jpeg") {
+            image = await pdf.embedJpg(bytes);
+          } else if (file.type === "image/png") {
+            image = await pdf.embedPng(bytes);
+          } else {
+            continue;
+          }
+
+          const availableWidth = pageWidth - margin * 2;
+          const availableHeight = pageHeight - margin * 2;
+          const scale = Math.min(
+            availableWidth / image.width,
+            availableHeight / image.height
+          );
+
+          const width = image.width * scale;
+          const height = image.height * scale;
+          const page = pdf.addPage([pageWidth, pageHeight]);
+
+          page.drawImage(image, {
+            x: (pageWidth - width) / 2,
+            y: (pageHeight - height) / 2,
+            width,
+            height
+          });
+        }
+
+        const pdfBytes = await pdf.save();
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "converted-images.pdf";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        status.textContent = "Success! Your PDF download should begin now.";
+      } catch (error) {
+        console.error(error);
+        status.textContent =
+          "Conversion failed. Try smaller JPG or PNG images.";
+      } finally {
+        convertButton.disabled = files.length === 0;
+      }
+    });
+
+    renderFiles();
+  </script>
+</body>
+</html>
